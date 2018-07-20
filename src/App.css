@@ -1,0 +1,15 @@
+@import '~antd/dist/antd.css';
+
+/*set brower responsive for table that hide authon column*/
+@media screen  and (max-width:480px) {
+    .author{
+        display: none;
+    }
+}
+
+/*set zebra-stripe for table*/
+table tr:nth-child(odd){
+
+    background-color: aquamarine;
+
+}
