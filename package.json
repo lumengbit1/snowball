@@ -8,9 +8,19 @@
     "babel-polyfill": "^6.26.0",
     "console-polyfill": "^0.3.0",
     "es5-shim": "^4.5.10",
+    "exceljs": "^1.5.1",
+    "js-export-excel": "^1.1.0",
+    "js-xlsx": "^0.8.22",
     "react": "^16.4.1",
+    "react-csv": "^1.0.14",
+    "react-data-export": "^0.4.2",
     "react-dom": "^16.4.1",
-    "react-scripts": "1.1.4"
+    "react-fileupload": "^2.4.0",
+    "react-scripts": "1.1.4",
+    "reqwest": "^2.0.5",
+    "table-export": "^1.0.2",
+    "xlsx": "^0.13.2",
+    "xlsx-style": "^0.8.13"
   },
   "scripts": {
     "start": "react-scripts start",
