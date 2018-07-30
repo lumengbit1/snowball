@@ -16,8 +16,8 @@ const ExcelColumn = ReactExport.ExcelFile.ExcelColumn;
 
 //const Option = Select.Option;
 
-
-
+let day = new Date();
+let today = day.toLocaleDateString();
 
 class App extends Component {
 
@@ -197,7 +197,11 @@ class App extends Component {
             type: 'json',
         }).then((data) => {
             if(data.affectedRows===1){
-                window.location.reload();
+                message.success('Delete Success');
+                //window.location.reload();
+                this.fetch()
+            }else{
+                message.error('Delete Error');
             }
         })
     }
@@ -244,7 +248,11 @@ class App extends Component {
                     visible: false,
                     confirmLoading: false,
                 });
-                window.location.reload();
+                message.success('Edit Success');
+                //window.location.reload();
+                this.fetch()
+            }else{
+                message.error('Edit Error');
             }
            // console.log('return',data)
 
@@ -363,6 +371,7 @@ const search=(
                   <span>
                   {/*<Button style={{'marginRight':'5px'}}>Edit</Button>*/}
                       <a className='edit' onClick={() => this.onEdit(index)} style={{'marginRight':'5px'}}>Edit</a>
+                      <span className="ant-divider" />
                   <Popconfirm title="Sure to delete?" onConfirm={() => this.onDelete(index)}>
                       <a className='edit'  >Delete</a>
                   </Popconfirm>
@@ -406,12 +415,13 @@ const search=(
             },
 
         onChange(info) {
+                //console.log('status',info.file.status)
                 if (info.file.status !== 'uploading') {
                     console.log(info.file, info.fileList);
                 }
                 if (info.file.status === 'done') {
                     message.success(`${info.file.name} file uploaded successfully`);
-                    window.location.reload();
+                   // window.location.reload();
                 } else if (info.file.status === 'error') {
                     message.error(`${info.file.name} file upload failed.`);
                 }
@@ -457,7 +467,7 @@ const search=(
                 <Table columns={columns} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange}/>
                   {/*<Button type="primary" onClick={this.onExport}>Download</Button>*/}
                   {/*<Button type="primary" style={{'marginRight':'15px'}}><CSVLink data={this.state.OraData} filename={"my-file.csv"} headers={headers}><Icon type="export" /> Export</CSVLink></Button>*/}
-                  <ExcelFile filename='Product'  element={<Button type="primary" style={{'marginRight':'15px'}}><Icon type="export" />Export</Button>} >
+                  <ExcelFile filename={'Custom'+today}  element={<Button type="primary" style={{'marginRight':'15px'}}><Icon type="export" />Export</Button>} >
                       <ExcelSheet data={this.state.OraData} name="Product" >
                           <ExcelColumn label="ID" value="id"/>
                           <ExcelColumn label="名称" value="name"/>
