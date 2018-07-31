@@ -7,10 +7,13 @@ import reqwest from 'reqwest';
 //import ExportJsonExcel from 'js-export-excel';
 import {CSVLink} from 'react-csv';
 import ReactExport from "react-data-export";
+import io from 'socket.io-client';
 
 const ExcelFile = ReactExport.ExcelFile;
 const ExcelSheet = ReactExport.ExcelFile.ExcelSheet;
 const ExcelColumn = ReactExport.ExcelFile.ExcelColumn;
+
+const msgSocket = io.connect('http://localhost:3000/');
 
 
 
@@ -48,7 +51,6 @@ class App extends Component {
 
 
 
-
     handleTableChange = (pagination, filters, sorter) => {
         const pager = { ...this.state.pagination };
         pager.current = pagination.current;
@@ -63,6 +65,7 @@ class App extends Component {
             filters: this.state.searchText,
             ...filters,
         });
+
     }
     fetch = (params = {}) => {
         console.log('params.all:', params.all);
@@ -110,7 +113,7 @@ class App extends Component {
                 //console.log(data)
             }else{
                 this.setState({tableData:data,loading: false,pagination});
-                console.log(data)
+                console.log(data);
             }
 
 
@@ -132,12 +135,17 @@ class App extends Component {
         //await this.fetch();
 
         await this.getalldata();
+        msgSocket.on('refresh', ()=>{
+            this.fetch()})
+
 
     }
     async componentWillMount(){
         //await this.getalldata();
         await this.fetch();
     }
+
+
 
 //load table data by <select>'s options
 //         handleChange=(value)=> {
@@ -234,6 +242,7 @@ class App extends Component {
         this.setState({
             confirmLoading: true,
         });
+        msgSocket.emit('editsend');
         reqwest({
             url: 'http://localhost:3000/edit',
             method: 'post',
@@ -249,7 +258,8 @@ class App extends Component {
                     confirmLoading: false,
                 });
                 message.success('Edit Success');
-                //window.location.reload();
+
+
                 this.fetch()
             }else{
                 message.error('Edit Error');
@@ -273,6 +283,7 @@ class App extends Component {
         let data = Object.assign({}, this.state.modalData, { [id]: val })
         this.setState({modalData:data})
     }
+
 
 
 
