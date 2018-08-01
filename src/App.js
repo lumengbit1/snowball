@@ -21,7 +21,7 @@ const msgSocket = io.connect('http://localhost:3000/');
 
 let day = new Date();
 let today = day.toLocaleDateString();
-
+let subtabledata=[];
 class App extends Component {
 
     constructor(props){
@@ -38,6 +38,7 @@ class App extends Component {
             searchText: '',
             visible: false,
             modalData:{},
+            subtableData:[],
           //  colname:[],
 
 
@@ -110,10 +111,10 @@ class App extends Component {
             // this.setState({OraData:lastGist,selectDate:arr,tableData:defaultData});
             if(typeof(params.all)!='undefined'){
                 this.setState({OraData:data,loading: false});
-                //console.log(data)
+                console.log('oradata',data)
             }else{
                 this.setState({tableData:data,loading: false,pagination});
-                console.log(data);
+                console.log('tabledata',data);
             }
 
 
@@ -136,13 +137,17 @@ class App extends Component {
 
         await this.getalldata();
         msgSocket.on('refresh', ()=>{
-            this.fetch()})
+           // console.log('refresh')
+            this.fetch();
+        this.getalldata()})
+
 
 
     }
     async componentWillMount(){
         //await this.getalldata();
         await this.fetch();
+
     }
 
 
@@ -283,6 +288,65 @@ class App extends Component {
         let data = Object.assign({}, this.state.modalData, { [id]: val })
         this.setState({modalData:data})
     }
+    onExpand=(expanded, record,index)=>{
+        console.log('extendindex',this.state.index)
+        this.setState({ loading: true });
+        reqwest({
+            url: 'http://localhost:3000/subtable',
+            method: 'post',
+            data: {
+                 indexname:record.name
+            },
+            type: 'json',
+        }).then((data) => {
+            subtabledata[record.id]=data
+            this.setState({subtableData:subtabledata,loading: false});
+            console.log('subtable',subtabledata);
+        });
+    }
+
+    expandedRowRender = (record, index, indent) => {
+        console.log('record',record)
+        console.log('index',index)
+        console.log('indent',indent)
+
+
+        const columns = [
+            { title: 'ID', dataIndex: 'id', key: 'id' },
+            { title: '名称', dataIndex: 'name', key: 'name' },
+            { title: '数量', dataIndex: 'number', key:'number'},
+            { title: '价钱', dataIndex: 'price', key: 'price' },
+            { title: '总价', dataIndex: 'sum', key: 'sum' },
+            { title: '重量', dataIndex: 'weight', key: 'weight' },
+            { title: '快递公司', dataIndex: 'company', key: 'company' },
+            { title: '付款', dataIndex: 'finish', key: 'finish' },
+            { title: '备注', dataIndex: 'remark', key: 'remark' },
+            {
+                title: 'Action',
+                dataIndex: 'operation',
+                key: 'operation',
+                render: () => (
+                    <span className={'table-operation'}>
+            <a href="#">Pause</a>
+            <a href="#">Stop</a>
+
+          </span>
+                ),
+            },
+        ];
+      // this.setState({index:index})
+        //subtabledata.splice(index,0,this.state.subtableData)
+        console.log('subtabledata',this.state.subtableData)
+        let data = this.state.subtableData
+        return (
+            <Table
+                columns={columns}
+                dataSource={data[record.id]}
+                pagination={false}
+            />
+        );
+    };
+
 
 
 
@@ -327,34 +391,10 @@ const search=(
          //  render: name => `${name.first} ${name.last}`,
 
       }, {
-          title: '规格',
-          dataIndex: 'norm',
-          className:'norm',
-         sorter: (a, b) => {return (a.norm||'').toUpperCase().localeCompare((b.norm||'').toUpperCase())},
-
-      },{
-          title: '数量',
-          dataIndex: 'number',
-          className:'number',
-         sorter: (a, b) => {return a.number - b.number},
-
-      },{
-          title: '价格',
-          dataIndex: 'price',
-          className:'price',
-         sorter: (a, b) => {return a.price - b.price},
-
-      },{
-          title: '会员价',
-          dataIndex: 'memberprice',
-          className:'memberprice',
-         sorter: (a, b) => {return a.memberprice - b.memberprice},
-
-      },{
-          title: '付款',
-          dataIndex: 'pay',
-          className:'pay',
-         sorter: (a, b) => {return a.pay - b.pay},
+          title: '会员',
+          dataIndex: 'member',
+          className:'member',
+         sorter: (a, b) => {return (a.member||'').toUpperCase().localeCompare((b.member||'').toUpperCase())},
 
       },{
           title: '地址',
@@ -363,10 +403,10 @@ const search=(
          sorter: (a, b) => {return (a.address||'').toUpperCase().localeCompare((b.address||'').toUpperCase())},
 
       },{
-          title: '编码',
-          dataIndex: 'code',
-          className:'code',
-         sorter: (a, b) => {return (a.code||'').toUpperCase().localeCompare((b.code||'').toUpperCase())},
+          title: '订单号',
+          dataIndex: 'ordernum',
+          className:'ordernum',
+         sorter: (a, b) => {return (a.ordernum||'').toUpperCase().localeCompare((b.ordernum||'').toUpperCase())},
 
       },{
           title: '备注',
@@ -464,7 +504,6 @@ const search=(
           <div className="container">
               <div className="starter-template">
                   <h1>My Book Catalogue</h1>
-                  <label htmlFor="language">Language</label>
 
                   {/*<Select*/}
                       {/*mode="multiple"*/}
@@ -475,21 +514,23 @@ const search=(
                   {/*>*/}
                       {/*{options}*/}
                   {/*</Select>*/}
-                <Table columns={columns} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange}/>
+                  <Button type="primary"><Icon type="user-add"/>新订单</Button>
+                <Table columns={columns}  expandedRowRender={this.expandedRowRender} onExpand={this.onExpand} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange} />
                   {/*<Button type="primary" onClick={this.onExport}>Download</Button>*/}
                   {/*<Button type="primary" style={{'marginRight':'15px'}}><CSVLink data={this.state.OraData} filename={"my-file.csv"} headers={headers}><Icon type="export" /> Export</CSVLink></Button>*/}
-                  <ExcelFile filename={'Custom'+today}  element={<Button type="primary" style={{'marginRight':'15px'}}><Icon type="export" />Export</Button>} >
+                  <ExcelFile filename={'Product'+today}  element={<Button type="primary" style={{'marginRight':'15px'}}><Icon type="export" />Export</Button>} >
                       <ExcelSheet data={this.state.OraData} name="Product" >
                           <ExcelColumn label="ID" value="id"/>
                           <ExcelColumn label="名称" value="name"/>
-                          <ExcelColumn label="规格" value="norm"/>
                           <ExcelColumn label="数量" value="number"/>
-                          <ExcelColumn label="价格" value="price"/>
-                          <ExcelColumn label="会员价" value="memberprice"/>
-                          <ExcelColumn label="付款" value="pay"/>
-                          <ExcelColumn label="地址" value="address"/>
-                          <ExcelColumn label="编码" value="code"/>
+                          <ExcelColumn label="价钱" value="price"/>
+                          <ExcelColumn label="总价" value="sum"/>
+                          <ExcelColumn label="重量" value="weight"/>
+                          <ExcelColumn label="快递公司" value="company"/>
+                          <ExcelColumn label="付款" value="finish"/>
                           <ExcelColumn label="备注" value="remark"/>
+                          <ExcelColumn label="客户" value="customname"/>
+
                           {/*<ExcelColumn label="付款"*/}
                                        {/*value={(col) => col.pay ? "Married" : "Single"}/>*/}
                       </ExcelSheet>
