@@ -2,19 +2,89 @@
 
 import React, { Component } from 'react';
 import './App.css';
-import { Table,Select,Input,Button,Tooltip,Upload, message,Icon,Popconfirm,BackTop,Modal } from 'antd';
+import {
+    Table,
+    Select,
+    Input,
+    Button,
+    Tooltip,
+    Upload,
+    message,
+    Icon,
+    Popconfirm,
+    BackTop,
+    Modal,
+    Form,
+    Divider
+} from 'antd';
 import reqwest from 'reqwest';
 //import ExportJsonExcel from 'js-export-excel';
 import {CSVLink} from 'react-csv';
 import ReactExport from "react-data-export";
 import io from 'socket.io-client';
 
+const Option = Select.Option;
 const ExcelFile = ReactExport.ExcelFile;
 const ExcelSheet = ReactExport.ExcelFile.ExcelSheet;
 const ExcelColumn = ReactExport.ExcelFile.ExcelColumn;
 
 const msgSocket = io.connect('http://localhost:3000/');
 
+const EditableContext = React.createContext();
+const FormItem = Form.Item;
+const EditableRow = ({ form, index, ...props }) => (
+    <EditableContext.Provider value={form}>
+        <tr {...props} />
+    </EditableContext.Provider>
+);
+
+let EditableFormRow = Form.create()(EditableRow);
+
+class EditableCell extends Component {
+    getInput = () => {
+        if (this.props.inputType === 'number') {
+            return (<Select defaultValue="否" style={{ width: 120 }} >
+                <Option value="0">0</Option>
+                <Option value="1">1</Option>
+            </Select>)
+        }
+        return <Input />;
+    };
+
+    render() {
+        const {
+            editing,
+            dataIndex,
+            title,
+            inputType,
+            record,
+            index,
+            ...restProps
+        } = this.props;
+        return (
+            <EditableContext.Consumer>
+                {(form) => {
+                    const { getFieldDecorator } = form;
+                    return (
+                        <td {...restProps}>
+                            {editing ? (
+                                <FormItem style={{ margin: 0 }}>
+                                    {getFieldDecorator(dataIndex, {
+                                        rules: [{
+                                            required: true,
+                                            message: `Please Input ${title}!`,
+                                        }],
+                                        initialValue: record[dataIndex],
+                                    })(this.getInput())}
+                                </FormItem>
+                            ) : restProps.children}
+                        </td>
+                    );
+                }}
+            </EditableContext.Consumer>
+        );
+    }
+}
 
 
 //const Option = Select.Option;
@@ -39,6 +109,7 @@ class App extends Component {
             visible: false,
             modalData:{},
             subtableData:[],
+            editingKey: '',
           //  colname:[],
 
 
@@ -137,7 +208,7 @@ class App extends Component {
 
         await this.getalldata();
         msgSocket.on('refresh', ()=>{
-           // console.log('refresh')
+            console.log('refresh')
             this.fetch();
         this.getalldata()})
 
@@ -205,7 +276,7 @@ class App extends Component {
             method: 'post',
             data: {
                 delete: 'delete',
-                data:this.state.tableData[index].id,
+                data:index,
             },
             type: 'json',
         }).then((data) => {
@@ -315,7 +386,7 @@ class App extends Component {
             { title: 'ID', dataIndex: 'id', key: 'id' },
             { title: '名称', dataIndex: 'name', key: 'name' },
             { title: '数量', dataIndex: 'number', key:'number'},
-            { title: '价钱', dataIndex: 'price', key: 'price' },
+            { title: '单价', dataIndex: 'price', key: 'price' },
             { title: '总价', dataIndex: 'sum', key: 'sum' },
             { title: '重量', dataIndex: 'weight', key: 'weight' },
             { title: '快递公司', dataIndex: 'company', key: 'company' },
@@ -348,10 +419,61 @@ class App extends Component {
     };
 
 
+    isEditing = (record) => {
+        return record.id === this.state.editingKey;
+    };
+
+    edit(key) {
+        this.setState({ editingKey: key });
+    }
+
+    save(form, key) {
+        form.validateFields((error, row) => {
+            if (error) {
+                return;
+            }
+            row.id=key
+            console.log('row',row)
+            this.setState({confirmLoading: true,})
+             msgSocket.emit('editsend');
+            reqwest({
+                url: 'http://localhost:3000/edit',
+                method: 'post',
+                data: {
+                    edit: 'edit',
+                    data:row,
+                },
+                type: 'json',
+            }).then((data) => {
+                if(data.affectedRows===1){
+                    this.setState({
+                        visible: false,
+                        confirmLoading: false,
+                        editingKey: ''
+                    });
+
+                    message.success('Edit Success');
+                    this.fetch()
+                }else{
+                    message.error('Edit Error');
+                }
+
+                // console.log('return',data)
+
+            })
+
+
+        });
+    }
+
+    cancel = () => {
+        this.setState({ editingKey: '' });
+    };
 
 
 
     render() {
+
 
 const search=(
         <div className="custom-filter-dropdown">
@@ -387,6 +509,7 @@ const search=(
           filterDropdown:search,
           filterDropdownVisible: this.state.filterDropdownVisible,
           onFilterDropdownVisibleChange: visible => this.setState({ filterDropdownVisible: visible }),
+          editable: true,
          //  sorter: true,
          //  render: name => `${name.first} ${name.last}`,
 
@@ -395,18 +518,21 @@ const search=(
           dataIndex: 'member',
           className:'member',
          sorter: (a, b) => {return (a.member||'').toUpperCase().localeCompare((b.member||'').toUpperCase())},
+          editable: true,
 
       },{
           title: '地址',
           dataIndex: 'address',
           className:'address',
          sorter: (a, b) => {return (a.address||'').toUpperCase().localeCompare((b.address||'').toUpperCase())},
+          editable: true,
 
       },{
           title: '订单号',
           dataIndex: 'ordernum',
           className:'ordernum',
          sorter: (a, b) => {return (a.ordernum||'').toUpperCase().localeCompare((b.ordernum||'').toUpperCase())},
+          editable: true,
 
       },{
           title: '备注',
@@ -414,19 +540,44 @@ const search=(
           className:'remark',
        //   defaultSortOrder: 'remark',
          sorter: (a, b) =>{return (a.remark||'').toUpperCase().localeCompare((b.remark||'').toUpperCase())},
+          editable: true,
       }, {
           title: '编辑',
           dataIndex: 'operation',
-          render: (text, record, index) => {
+          render: (text, record) => {
+              const editable = this.isEditing(record);
               return (
-                  <span>
-                  {/*<Button style={{'marginRight':'5px'}}>Edit</Button>*/}
-                      <a className='edit' onClick={() => this.onEdit(index)} style={{'marginRight':'5px'}}>Edit</a>
-                      <span className="ant-divider" />
-                  <Popconfirm title="Sure to delete?" onConfirm={() => this.onDelete(index)}>
-                      <a className='edit'  >Delete</a>
+              <div>
+                  {editable ? (
+                      <span>
+                  <EditableContext.Consumer>
+                    {form => (
+                        <a
+                            href="javascript:;"
+                            onClick={() => this.save(form, record.id)}
+                            style={{ marginRight: 8 }}
+                        >
+                            Save
+                        </a>
+                    )}
+                  </EditableContext.Consumer>
+                  <Popconfirm
+                      title="Sure to cancel?"
+                      onConfirm={() => this.cancel(record.id)}
+                  >
+                    <a>Cancel</a>
                   </Popconfirm>
+                </span>
+                  ) : (
+                      <a onClick={() => this.edit(record.id)}>Edit</a>
+                  )}
+                  <Divider type="vertical" />
+                  <span>
+                    <Popconfirm title="Sure to delete custom and products?" onConfirm={() => this.onDelete(record.id)}>
+                        <a>Delete</a>
+                    </Popconfirm>
                   </span>
+              </div>
               );
           },
       }];
@@ -479,7 +630,27 @@ const search=(
             },
         };
 
-
+        const components = {
+            body: {
+                row: EditableFormRow,
+                cell: EditableCell,
+            },
+        };
+        const tablecolumns = columns.map((col) => {
+            if (!col.editable) {
+                return col;
+            }
+            return {
+                ...col,
+                onCell: record => ({
+                    record,
+                    inputType: col.dataIndex === 'member' ? 'number' : 'text',
+                    dataIndex: col.dataIndex,
+                    title: col.title,
+                    editing: this.isEditing(record),
+                }),
+            };
+        });
 
 
     return (
@@ -515,7 +686,7 @@ const search=(
                       {/*{options}*/}
                   {/*</Select>*/}
                   <Button type="primary"><Icon type="user-add"/>新订单</Button>
-                <Table columns={columns}  expandedRowRender={this.expandedRowRender} onExpand={this.onExpand} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange} />
+                <Table components={components}  columns={tablecolumns}  expandedRowRender={this.expandedRowRender} onExpand={this.onExpand} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange} />
                   {/*<Button type="primary" onClick={this.onExport}>Download</Button>*/}
                   {/*<Button type="primary" style={{'marginRight':'15px'}}><CSVLink data={this.state.OraData} filename={"my-file.csv"} headers={headers}><Icon type="export" /> Export</CSVLink></Button>*/}
                   <ExcelFile filename={'Product'+today}  element={<Button type="primary" style={{'marginRight':'15px'}}><Icon type="export" />Export</Button>} >
@@ -523,7 +694,7 @@ const search=(
                           <ExcelColumn label="ID" value="id"/>
                           <ExcelColumn label="名称" value="name"/>
                           <ExcelColumn label="数量" value="number"/>
-                          <ExcelColumn label="价钱" value="price"/>
+                          <ExcelColumn label="单价" value="price"/>
                           <ExcelColumn label="总价" value="sum"/>
                           <ExcelColumn label="重量" value="weight"/>
                           <ExcelColumn label="快递公司" value="company"/>
