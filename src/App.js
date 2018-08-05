@@ -22,6 +22,10 @@ import reqwest from 'reqwest';
 import {CSVLink} from 'react-csv';
 import ReactExport from "react-data-export";
 import io from 'socket.io-client';
+import DrawerForm from './DrawerForm'
+
+
+
 
 const Option = Select.Option;
 const ExcelFile = ReactExport.ExcelFile;
@@ -40,12 +44,22 @@ const EditableRow = ({ form, index, ...props }) => (
 
 let EditableFormRow = Form.create()(EditableRow);
 
+const DrawerFormAPP = Form.create()(DrawerForm);
+
 class EditableCell extends Component {
     getInput = () => {
         if (this.props.inputType === 'number') {
-            return (<Select defaultValue="否" style={{ width: 120 }} >
+            return (<Select defaultValue="0" style={{ width: 120 }} >
                 <Option value="0">0</Option>
                 <Option value="1">1</Option>
+            </Select>)
+        }else if(this.props.inputType === 'select'){
+            return (<Select defaultValue="无" style={{ width: 120 }} >
+                <Option value="无">无</Option>
+                <Option value="4px">4px</Option>
+                <Option value="澳邮">澳邮</Option>
+                <Option value="迅达">迅达</Option>
+                <Option value="其他">其他</Option>
             </Select>)
         }
         return <Input />;
@@ -211,6 +225,9 @@ class App extends Component {
             console.log('refresh')
             this.fetch();
         this.getalldata()})
+        msgSocket.on('subrefresh', ()=>{
+            console.log('subrefresh')
+            window.location.reload()})
 
 
 
@@ -271,6 +288,7 @@ class App extends Component {
     onDelete = (index) => {
        // console.log('index',index)
       //  console.log('indexdata',this.state.tableData[index].id)
+        msgSocket.emit('editsend');
         reqwest({
             url: 'http://localhost:3000/edit',
             method: 'post',
@@ -360,8 +378,8 @@ class App extends Component {
         this.setState({modalData:data})
     }
     onExpand=(expanded, record,index)=>{
-        console.log('extendindex',this.state.index)
-        this.setState({ loading: true });
+        console.log('extendindex',record.name)
+
         reqwest({
             url: 'http://localhost:3000/subtable',
             method: 'post',
@@ -384,34 +402,88 @@ class App extends Component {
 
         const columns = [
             { title: 'ID', dataIndex: 'id', key: 'id' },
-            { title: '名称', dataIndex: 'name', key: 'name' },
-            { title: '数量', dataIndex: 'number', key:'number'},
-            { title: '单价', dataIndex: 'price', key: 'price' },
-            { title: '总价', dataIndex: 'sum', key: 'sum' },
-            { title: '重量', dataIndex: 'weight', key: 'weight' },
-            { title: '快递公司', dataIndex: 'company', key: 'company' },
-            { title: '付款', dataIndex: 'finish', key: 'finish' },
-            { title: '备注', dataIndex: 'remark', key: 'remark' },
+            { title: '名称', dataIndex: 'name', key: 'name' ,editable: true,},
+            { title: '数量', dataIndex: 'number', key:'number',editable: true,},
+            { title: '单价', dataIndex: 'price', key: 'price' ,editable: true,},
+            { title: '总价', dataIndex: 'sum', key: 'sum',editable: true, },
+            { title: '重量', dataIndex: 'weight', key: 'weight' ,editable: true,},
+            { title: '快递公司', dataIndex: 'company', key: 'company' ,editable: true,},
+            { title: '付款', dataIndex: 'finish', key: 'finish' ,editable: true,},
+            { title: '备注', dataIndex: 'remark', key: 'remark' ,editable: true,},
             {
                 title: 'Action',
                 dataIndex: 'operation',
                 key: 'operation',
-                render: () => (
-                    <span className={'table-operation'}>
-            <a href="#">Pause</a>
-            <a href="#">Stop</a>
-
-          </span>
-                ),
+                render: (text, record) => {
+                    const editable = this.isEditing(record);
+                    return (
+                        <div>
+                            {editable ? (
+                                <span>
+                  <EditableContext.Consumer>
+                    {form => (
+                        <a
+                            href="javascript:;"
+                            onClick={() => this.subsave(form, record.id)}
+                            style={{ marginRight: 8 }}
+                        >
+                            Save
+                        </a>
+                    )}
+                  </EditableContext.Consumer>
+                  <Popconfirm
+                      title="Sure to cancel?"
+                      onConfirm={() => this.cancel(record.id)}
+                  >
+                    <a>Cancel</a>
+                  </Popconfirm>
+                </span>
+                            ) : (
+                                <a onClick={() => this.edit(record.id)}>Edit</a>
+                            )}
+                            <Divider type="vertical" />
+                            <span>
+                    <Popconfirm title="Sure to delete custom and products?" onConfirm={() => this.onsubDelete(record.id)}>
+                        <a>Delete</a>
+                    </Popconfirm>
+                  </span>
+                        </div>
+                    );
+                },
             },
         ];
       // this.setState({index:index})
         //subtabledata.splice(index,0,this.state.subtableData)
         console.log('subtabledata',this.state.subtableData)
         let data = this.state.subtableData
+
+        const components = {
+            body: {
+                row: EditableFormRow,
+                cell: EditableCell,
+            },
+        };
+        const tablecolumns = columns.map((col) => {
+            if (!col.editable) {
+                return col;
+            }
+            return {
+                ...col,
+                onCell: record => ({
+                    record,
+                    inputType: col.dataIndex === 'company' ? 'select' : 'text',
+                    dataIndex: col.dataIndex,
+                    title: col.title,
+                    editing: this.isEditing(record),
+                }),
+            };
+        });
+
+
         return (
-            <Table
-                columns={columns}
+            <Table ref='subtable'
+                components={components}
+                columns={tablecolumns}
                 dataSource={data[record.id]}
                 pagination={false}
             />
@@ -423,11 +495,11 @@ class App extends Component {
         return record.id === this.state.editingKey;
     };
 
-    edit(key) {
+    edit=(key)=> {
         this.setState({ editingKey: key });
     }
 
-    save(form, key) {
+    save=(form, key)=> {
         form.validateFields((error, row) => {
             if (error) {
                 return;
@@ -469,6 +541,73 @@ class App extends Component {
     cancel = () => {
         this.setState({ editingKey: '' });
     };
+
+
+
+    subsave=(form, key)=> {
+        form.validateFields((error, row) => {
+            if (error) {
+                return;
+            }
+            row.id=key
+            console.log('row',row)
+            this.setState({confirmLoading: true,})
+            msgSocket.emit('subeditsend');
+            reqwest({
+                url: 'http://localhost:3000/edit',
+                method: 'post',
+                data: {
+                    subedit: 'subedit',
+                    data:row,
+                },
+                type: 'json',
+            }).then((data) => {
+                console.log('subsave',data)
+                if(data.affectedRows===1){
+                    this.setState({
+                        visible: false,
+                        confirmLoading: false,
+                        editingKey: ''
+                    });
+                    window.location.reload()
+                    message.success('Edit Success');
+                }else{
+                    message.error('Edit Error');
+                }
+
+                // console.log('return',data)
+
+            })
+
+
+        });
+    }
+    onsubDelete = (index) => {
+        // console.log('index',index)
+        //  console.log('indexdata',this.state.tableData[index].id)
+        msgSocket.emit('subeditsend');
+        reqwest({
+            url: 'http://localhost:3000/edit',
+            method: 'post',
+            data: {
+                subdelete: 'subdelete',
+                data:index,
+            },
+            type: 'json',
+        }).then((data) => {
+            if(data.affectedRows===1){
+                message.success('Delete Success');
+                //window.location.reload();
+                window.location.reload()
+
+            }else{
+                message.error('Delete Error');
+            }
+        })
+    }
+
+
+
 
 
 
@@ -685,8 +824,9 @@ const search=(
                   {/*>*/}
                       {/*{options}*/}
                   {/*</Select>*/}
-                  <Button type="primary"><Icon type="user-add"/>新订单</Button>
-                <Table components={components}  columns={tablecolumns}  expandedRowRender={this.expandedRowRender} onExpand={this.onExpand} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange} />
+
+                  <DrawerFormAPP/>
+                <Table  components={components}  columns={tablecolumns}  expandedRowRender={this.expandedRowRender} onExpand={this.onExpand} dataSource={this.state.tableData}  pagination={this.state.pagination} loading={this.state.loading} onChange={this.handleTableChange} />
                   {/*<Button type="primary" onClick={this.onExport}>Download</Button>*/}
                   {/*<Button type="primary" style={{'marginRight':'15px'}}><CSVLink data={this.state.OraData} filename={"my-file.csv"} headers={headers}><Icon type="export" /> Export</CSVLink></Button>*/}
                   <ExcelFile filename={'Product'+today}  element={<Button type="primary" style={{'marginRight':'15px'}}><Icon type="export" />Export</Button>} >

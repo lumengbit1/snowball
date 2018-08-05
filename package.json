@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "antd": "^3.6.6",
+    "antd": "^3.7.3",
     "babel": "^6.23.0",
+    "babel-plugin-import": "^1.8.0",
     "babel-polyfill": "^6.26.0",
     "console-polyfill": "^0.3.0",
     "es5-shim": "^4.5.10",
